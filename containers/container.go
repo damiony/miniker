@@ -36,6 +36,10 @@ func NewRunCommand() *cli.Command {
 				Name:  "cpuset",
 				Usage: "Cpus in which to allow execution",
 			},
+			&cli.StringFlag{
+				Name:  "v",
+				Usage: "Bind mount a volume",
+			},
 		},
 		Action: func(ctx *cli.Context) error {
 			if ctx.Args().Len() < 1 {
@@ -43,12 +47,13 @@ func NewRunCommand() *cli.Command {
 			}
 			cmd := ctx.Args().Slice()
 			tty := ctx.Bool("it")
+			volume := ctx.String("volume")
 			subsystemConfig := &subsystems.SubsystemConfig{
 				MemLimit: ctx.String("m"),
 				CpuSet:   ctx.String("cpuset"),
 				CpuShare: ctx.String("cpushare"),
 			}
-			Run(tty, cmd, subsystemConfig)
+			Run(tty, cmd, subsystemConfig, volume)
 			return nil
 		},
 	}
@@ -62,6 +67,17 @@ func NewInitCommand() *cli.Command {
 			logger.Sugar().Info("init come on")
 			err := RunContainerInitProcess()
 			return err
+		},
+	}
+}
+
+func NewCommitCommand() *cli.Command {
+	return &cli.Command{
+		Name:  "commit",
+		Usage: "Create a new image from a container",
+		Action: func(ctx *cli.Context) error {
+			logger.Sugar().Info("Commit a new image")
+			return nil
 		},
 	}
 }

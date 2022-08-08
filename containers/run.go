@@ -4,12 +4,13 @@ import (
 	"miniker/subsystems"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"syscall"
 )
 
-func Run(tty bool, args []string, cfg *subsystems.SubsystemConfig) {
-	parent, writePipe := NewParentProcess(tty)
+func Run(tty bool, args []string, cfg *subsystems.SubsystemConfig, volume string) {
+	parent, writePipe := NewParentProcess(tty, volume)
 	if parent == nil {
 		logger.Sugar().Error("New parent process error")
 		return
@@ -30,9 +31,15 @@ func Run(tty bool, args []string, cfg *subsystems.SubsystemConfig) {
 	// 将父进程的命令参数传递给子进程
 	sendCommandsToPipe(writePipe, args)
 	parent.Wait()
+
+	// 删除工作目录
+	rootUrl := "/root/software/"
+	mntUrl := "/root/software/mnt/"
+	deleteWorkSpace(rootUrl, mntUrl, volume)
+	os.Exit(0)
 }
 
-func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
+func NewParentProcess(tty bool, volume string) (*exec.Cmd, *os.File) {
 	// 创建管道，用于进程间通信
 	readPipe, writePipe, err := NewPipe()
 	if err != nil {
@@ -55,6 +62,11 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 		cmd.Stderr = os.Stderr
 	}
 	cmd.ExtraFiles = []*os.File{readPipe}
+
+	rootUrl := "/root/software/"
+	mntUrl := "/root/software/mnt/"
+	NewWorkSpace(rootUrl, mntUrl, volume)
+	cmd.Dir = mntUrl
 	return cmd, writePipe
 }
 
@@ -67,4 +79,184 @@ func sendCommandsToPipe(pipe *os.File, commands []string) {
 	if err != nil {
 		logger.Sugar().Error("error send commands :", err)
 	}
+}
+
+// 为容器创建工作目录
+func NewWorkSpace(rootUrl string, mntUrl string, volume string) error {
+	createReadOnlyLayer(rootUrl)
+	createWriteLayer(rootUrl)
+	createMountPoint(rootUrl, mntUrl)
+
+	// 挂载volume
+	if volume != "" {
+		volumeUrls := volumeUrlExtract(volume)
+		if len(volumeUrls) != 2 || volumeUrls[0] == "" || volumeUrls[1] == "" {
+			logger.Sugar().Errorf("Wrong volume parameters %s", volume)
+		} else {
+			volumeMount(rootUrl, mntUrl, volumeUrls)
+			logger.Sugar().Info(volume)
+		}
+	}
+
+	return nil
+}
+
+// 创建只读层
+func createReadOnlyLayer(rootUrl string) error {
+	busyBoxUrl := path.Join(rootUrl, "busybox")
+	busyBoxTar := path.Join(rootUrl, "busybox.tar")
+	exist, err := pathExists(busyBoxUrl)
+	if err != nil {
+		logger.Sugar().Errorf("Fail to judge whether dir %s exist. %v", busyBoxUrl, err)
+		return err
+	}
+	if !exist {
+		if err := os.Mkdir(busyBoxUrl, 0777); err != nil {
+			logger.Sugar().Errorf("error create read only layer. %v", err)
+			return err
+		}
+
+		if _, err := exec.Command("tar", "-zvf", busyBoxTar, "-c", busyBoxUrl).CombinedOutput(); err != nil {
+			logger.Sugar().Errorf("error tar busybox. %v", err)
+			return err
+		}
+	}
+	return nil
+}
+
+// 创建读写层
+func createWriteLayer(rootUrl string) error {
+	writeUrl := path.Join(rootUrl, "writeLayer")
+	if exist, _ := pathExists(writeUrl); exist {
+		return nil
+	}
+	if err := os.Mkdir(writeUrl, 0777); err != nil {
+		logger.Sugar().Errorf("error mkdir %s. %v", writeUrl, err)
+		return err
+	}
+	return nil
+}
+
+// 将读写层挂载为aufs
+func createMountPoint(rootUrl, mntUrl string) error {
+	if exist, _ := pathExists(mntUrl); !exist {
+		if err := os.Mkdir(mntUrl, 0777); err != nil {
+			logger.Sugar().Errorf("error mkdir %s. %v", mntUrl, err)
+			return err
+		}
+	}
+	// 将只读层和可写层挂载到mntUrl
+	dirs := "dirs=" + rootUrl + "writeLayer:" + rootUrl + "busybox"
+	cmd := exec.Command("mount", "-t", "aufs", "-o", dirs, "none", mntUrl)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Sugar().Errorf("error mount aufs. %v", err)
+		return err
+	}
+	return nil
+}
+
+// 检查文件路径是否存在
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// 提取volume参数
+func volumeUrlExtract(volume string) []string {
+	return strings.Split(volume, ":")
+}
+
+// 挂载volume
+func volumeMount(rootUrl string, mntUrl string, volumes []string) {
+	hostUrl := path.Join(rootUrl, volumes[0])
+	if exist, _ := pathExists(hostUrl); !exist {
+		if err := os.Mkdir(hostUrl, 0777); err != nil {
+			logger.Sugar().Errorf("error mkdir %s. %v", hostUrl, err)
+			return
+		}
+	}
+
+	guestUrl := path.Join(mntUrl, volumes[1])
+	if exist, _ := pathExists((guestUrl)); !exist {
+		if err := os.Mkdir(guestUrl, 0777); err != nil {
+			logger.Sugar().Errorf("error mkdir %s", guestUrl)
+			return
+		}
+	}
+
+	dirs := "dirs=" + hostUrl
+	cmd := exec.Command("mount", "-t", "aufs", "-o", dirs, "none", guestUrl)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Sugar().Errorf("error mount aufs. %v", err)
+	}
+}
+
+// 删除容器的工作目录
+func deleteWorkSpace(rootUrl string, mntUrl string, volume string) {
+	if volume != "" {
+		volumes := volumeUrlExtract(volume)
+		// 如果volumes参数无效
+		if len(volumes) != 2 || volumes[0] == "" || volumes[1] == "" {
+			deleteMountPoint(mntUrl)
+		} else {
+			volUrl := path.Join(mntUrl, volumes[1])
+			deleteMountPointWithVolume(mntUrl, volUrl)
+		}
+	} else {
+		deleteMountPoint(mntUrl)
+	}
+}
+
+// 删除挂载点
+func deleteMountPoint(mntUrl string) error {
+	// 卸载
+	cmd := exec.Command("umount", mntUrl)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Sugar().Errorf("error umount %s. %v", mntUrl, err)
+		return err
+	}
+	// 删除
+	if err := os.RemoveAll(mntUrl); err != nil {
+		logger.Sugar().Errorf("error remove %s. %v", mntUrl, err)
+		return err
+	}
+	return nil
+}
+
+// 删除volume和容器挂载点
+func deleteMountPointWithVolume(mntUrl string, volUrl string) error {
+	// 卸载volume
+	cmd := exec.Command("umount", volUrl)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Sugar().Errorf("error umount %s. %v", volUrl, err)
+		return err
+	}
+	// 卸载整个容器的挂载点
+	cmd = exec.Command("umount", mntUrl)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Sugar().Errorf("error umount %s. %v", mntUrl, err)
+		return err
+	}
+	// 删除整个容器的挂载点
+	if err := os.RemoveAll(mntUrl); err != nil {
+		logger.Sugar().Errorf("error remove %s. %v", mntUrl, err)
+		return err
+	}
+	return nil
 }
