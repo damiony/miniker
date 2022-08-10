@@ -15,6 +15,7 @@ func main() {
 		Commands: []*cli.Command{
 			containers.NewRunCommand(),
 			containers.NewInitCommand(),
+			containers.NewCommitCommand(),
 		},
 	}
 	if err := app.Run(os.Args); err != nil {

@@ -153,7 +153,7 @@ func createWriteLayer(rootUrl string) error {
 // 将读写层挂载为aufs
 func createMountPoint(rootUrl, mntUrl string) error {
 	if exist, _ := pathExists(mntUrl); !exist {
-		if err := os.Mkdir(mntUrl, 0777); err != nil {
+		if err := os.MkdirAll(mntUrl, 0777); err != nil {
 			logger.Sugar().Errorf("error mkdir %s. %v", mntUrl, err)
 			return err
 		}

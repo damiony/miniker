@@ -2,6 +2,7 @@ package containers
 
 import (
 	"errors"
+	"fmt"
 	"miniker/subsystems"
 
 	"github.com/urfave/cli/v2"
@@ -9,6 +10,8 @@ import (
 )
 
 var logger *zap.Logger
+var rootUrl string = "/root/software"
+var mntUrl string = "/root/software/mnt"
 
 func init() {
 	logger, _ = zap.NewProduction()
@@ -76,6 +79,11 @@ func NewCommitCommand() *cli.Command {
 		Usage: "Create a new image from a container",
 		Action: func(ctx *cli.Context) error {
 			logger.Sugar().Info("Commit a new image")
+			if ctx.Args().Len() < 1 {
+				return fmt.Errorf("wrong parameters")
+			}
+			imangeName := ctx.Args().Get(0)
+			commitImage(imangeName)
 			return nil
 		},
 	}
