@@ -9,6 +9,7 @@ import (
 	"syscall"
 )
 
+// run命令的主要执行逻辑
 func Run(tty bool, args []string, cfg *subsystems.SubsystemConfig, volume string) {
 	parent, writePipe := NewParentProcess(tty, volume)
 	if parent == nil {
@@ -32,13 +33,14 @@ func Run(tty bool, args []string, cfg *subsystems.SubsystemConfig, volume string
 	sendCommandsToPipe(writePipe, args)
 	parent.Wait()
 
-	// 删除工作目录
+	// // 删除工作目录
 	rootUrl := "/root/software/"
 	mntUrl := "/root/software/mnt/"
 	deleteWorkSpace(rootUrl, mntUrl, volume)
 	os.Exit(0)
 }
 
+// 创建子进程，执行init命令
 func NewParentProcess(tty bool, volume string) (*exec.Cmd, *os.File) {
 	// 创建管道，用于进程间通信
 	readPipe, writePipe, err := NewPipe()
@@ -48,12 +50,28 @@ func NewParentProcess(tty bool, volume string) (*exec.Cmd, *os.File) {
 	}
 	// 调用进程自身，进而创建出一个新进程，新进程位于隔离环境中
 	cmd := exec.Command("/proc/self/exe", "init")
+	// 需要配置CLONE_NEWUSER，否则执行pivot_root时会一直提示参数错误
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWIPC |
 			syscall.CLONE_NEWPID |
 			syscall.CLONE_NEWUTS |
 			syscall.CLONE_NEWNET |
+			syscall.CLONE_NEWUSER |
 			syscall.CLONE_NEWNS,
+		UidMappings: []syscall.SysProcIDMap{
+			{
+				ContainerID: 0,
+				HostID:      os.Getuid(),
+				Size:        1,
+			},
+		},
+		GidMappings: []syscall.SysProcIDMap{
+			{
+				ContainerID: 0,
+				HostID:      os.Getgid(),
+				Size:        1,
+			},
+		},
 	}
 	// 将`readPipe`传递给新进程，用于读取父进程传递给它的消息
 	if tty {
@@ -105,22 +123,17 @@ func NewWorkSpace(rootUrl string, mntUrl string, volume string) error {
 func createReadOnlyLayer(rootUrl string) error {
 	busyBoxUrl := path.Join(rootUrl, "busybox")
 	busyBoxTar := path.Join(rootUrl, "busybox.tar")
-	exist, err := pathExists(busyBoxUrl)
-	if err != nil {
-		logger.Sugar().Errorf("Fail to judge whether dir %s exist. %v", busyBoxUrl, err)
+	if err := os.MkdirAll(busyBoxUrl, 0777); err != nil {
+		logger.Sugar().Errorf("error create read only layer. %v", err)
 		return err
 	}
-	if !exist {
-		if err := os.Mkdir(busyBoxUrl, 0777); err != nil {
-			logger.Sugar().Errorf("error create read only layer. %v", err)
-			return err
-		}
 
-		if _, err := exec.Command("tar", "-zvf", busyBoxTar, "-c", busyBoxUrl).CombinedOutput(); err != nil {
-			logger.Sugar().Errorf("error tar busybox. %v", err)
-			return err
-		}
+	if _, err := exec.Command("tar", "-xvf", busyBoxTar, "-C", busyBoxUrl).CombinedOutput(); err != nil {
+		logger.Sugar().Errorf("error tar busybox. %v", err)
+		return err
 	}
+	logger.Sugar().Infof("create readonly dir %s", busyBoxUrl)
+
 	return nil
 }
 

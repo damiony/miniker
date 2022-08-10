@@ -16,9 +16,8 @@ func init() {
 
 func NewRunCommand() *cli.Command {
 	return &cli.Command{
-		Name: "run",
-		Usage: `create a container
-				miniker run -it [command]`,
+		Name:  "run",
+		Usage: `Create a container miniker run -it [command]`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "it",
