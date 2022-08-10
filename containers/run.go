@@ -111,7 +111,7 @@ func NewWorkSpace(rootUrl string, mntUrl string, volume string) error {
 		if len(volumeUrls) != 2 || volumeUrls[0] == "" || volumeUrls[1] == "" {
 			logger.Sugar().Errorf("Wrong volume parameters %s", volume)
 		} else {
-			volumeMount(rootUrl, mntUrl, volumeUrls)
+			volumeMount(mntUrl, volumeUrls)
 			logger.Sugar().Info(volume)
 		}
 	}
@@ -188,19 +188,17 @@ func volumeUrlExtract(volume string) []string {
 }
 
 // 挂载volume
-func volumeMount(rootUrl string, mntUrl string, volumes []string) {
-	hostUrl := path.Join(rootUrl, volumes[0])
-	if exist, _ := pathExists(hostUrl); !exist {
-		if err := os.Mkdir(hostUrl, 0777); err != nil {
-			logger.Sugar().Errorf("error mkdir %s. %v", hostUrl, err)
-			return
-		}
+func volumeMount(mntUrl string, volumes []string) {
+	hostUrl := volumes[0]
+	if err := os.MkdirAll(hostUrl, 0777); err != nil {
+		logger.Sugar().Errorf("error mkdir %s. %v", hostUrl, err)
+		return
 	}
 
 	guestUrl := path.Join(mntUrl, volumes[1])
-	if exist, _ := pathExists((guestUrl)); !exist {
-		if err := os.Mkdir(guestUrl, 0777); err != nil {
-			logger.Sugar().Errorf("error mkdir %s", guestUrl)
+	if exist, _ := pathExists(guestUrl); !exist {
+		if err := os.MkdirAll(guestUrl, 0777); err != nil {
+			logger.Sugar().Errorf("error mkdir %s. %v", guestUrl, err)
 			return
 		}
 	}

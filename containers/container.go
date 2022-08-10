@@ -17,7 +17,7 @@ func init() {
 func NewRunCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "run",
-		Usage: `Create a container miniker run -it [command]`,
+		Usage: `Create a container. miniker run -it [command]`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "it",
@@ -46,7 +46,7 @@ func NewRunCommand() *cli.Command {
 			}
 			cmd := ctx.Args().Slice()
 			tty := ctx.Bool("it")
-			volume := ctx.String("volume")
+			volume := ctx.String("v")
 			subsystemConfig := &subsystems.SubsystemConfig{
 				MemLimit: ctx.String("m"),
 				CpuSet:   ctx.String("cpuset"),
