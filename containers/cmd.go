@@ -42,20 +42,37 @@ func NewRunCommand() *cli.Command {
 				Name:  "v",
 				Usage: "Bind mount a volume",
 			},
+			&cli.StringFlag{
+				Name:  "d",
+				Usage: "Run container in background",
+			},
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "Assign a name to the container",
+			},
 		},
 		Action: func(ctx *cli.Context) error {
 			if ctx.Args().Len() < 1 {
 				return errors.New("wrong container command")
 			}
-			cmd := ctx.Args().Slice()
-			tty := ctx.Bool("it")
+			createTty := ctx.Bool("it")
+			detach := ctx.String("d")
+			if createTty && detach != "" {
+				return errors.New("-it and -d cannot exist at the same time")
+			}
+			if !createTty && detach == "" {
+				return errors.New("at least one of the '-it' and '-d' must exist")
+			}
+
 			volume := ctx.String("v")
 			subsystemConfig := &subsystems.SubsystemConfig{
 				MemLimit: ctx.String("m"),
 				CpuSet:   ctx.String("cpuset"),
 				CpuShare: ctx.String("cpushare"),
 			}
-			Run(tty, cmd, subsystemConfig, volume)
+			cmds := ctx.Args().Slice()
+			containerName := ctx.String("name")
+			Run(createTty, cmds, subsystemConfig, volume, containerName)
 			return nil
 		},
 	}
@@ -84,6 +101,18 @@ func NewCommitCommand() *cli.Command {
 			}
 			imangeName := ctx.Args().Get(0)
 			commitImage(imangeName)
+			return nil
+		},
+	}
+}
+
+func NewPsCommand() *cli.Command {
+	return &cli.Command{
+		Name:  "ps",
+		Usage: "List all containers info",
+		Action: func(ctx *cli.Context) error {
+			logger.Sugar().Info("List container info")
+			listContainers()
 			return nil
 		},
 	}

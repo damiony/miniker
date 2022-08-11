@@ -10,8 +10,8 @@ import (
 )
 
 // run命令的主要执行逻辑
-func Run(tty bool, args []string, cfg *subsystems.SubsystemConfig, volume string) {
-	parent, writePipe := NewParentProcess(tty, volume)
+func Run(createTty bool, args []string, cfg *subsystems.SubsystemConfig, volume string, containerName string) {
+	parent, writePipe := NewParentProcess(createTty, volume)
 	if parent == nil {
 		logger.Sugar().Error("New parent process error")
 		return
@@ -21,6 +21,7 @@ func Run(tty bool, args []string, cfg *subsystems.SubsystemConfig, volume string
 		return
 	}
 
+	containerName = recordContainerInfo(parent.Process.Pid, containerName, args)
 	// 创建cgroup管理器
 	cgroupManager := subsystems.NewCgroupManager("miniker", cfg)
 	defer cgroupManager.Destroy()
@@ -31,17 +32,22 @@ func Run(tty bool, args []string, cfg *subsystems.SubsystemConfig, volume string
 
 	// 将父进程的命令参数传递给子进程
 	sendCommandsToPipe(writePipe, args)
-	parent.Wait()
 
-	// // 删除工作目录
-	rootUrl := "/root/software/"
-	mntUrl := "/root/software/mnt/"
-	deleteWorkSpace(rootUrl, mntUrl, volume)
+	if createTty {
+		parent.Wait()
+
+		// 删除工作目录
+		rootUrl := "/root/software/"
+		mntUrl := "/root/software/mnt/"
+		deleteWorkSpace(rootUrl, mntUrl, volume)
+
+		deleteContainerInfo(containerName)
+	}
 	os.Exit(0)
 }
 
 // 创建子进程，执行init命令
-func NewParentProcess(tty bool, volume string) (*exec.Cmd, *os.File) {
+func NewParentProcess(createTty bool, volume string) (*exec.Cmd, *os.File) {
 	// 创建管道，用于进程间通信
 	readPipe, writePipe, err := NewPipe()
 	if err != nil {
@@ -74,7 +80,7 @@ func NewParentProcess(tty bool, volume string) (*exec.Cmd, *os.File) {
 		},
 	}
 	// 将`readPipe`传递给新进程，用于读取父进程传递给它的消息
-	if tty {
+	if createTty {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
