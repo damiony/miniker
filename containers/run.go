@@ -11,7 +11,7 @@ import (
 
 // run命令的主要执行逻辑
 func Run(createTty bool, args []string, cfg *subsystems.SubsystemConfig, volume string, containerName string) {
-	parent, writePipe := NewParentProcess(createTty, volume)
+	parent, writePipe := NewParentProcess(createTty, volume, containerName)
 	if parent == nil {
 		logger.Sugar().Error("New parent process error")
 		return
@@ -47,7 +47,7 @@ func Run(createTty bool, args []string, cfg *subsystems.SubsystemConfig, volume 
 }
 
 // 创建子进程，执行init命令
-func NewParentProcess(createTty bool, volume string) (*exec.Cmd, *os.File) {
+func NewParentProcess(createTty bool, volume string, containerName string) (*exec.Cmd, *os.File) {
 	// 创建管道，用于进程间通信
 	readPipe, writePipe, err := NewPipe()
 	if err != nil {
@@ -79,12 +79,22 @@ func NewParentProcess(createTty bool, volume string) (*exec.Cmd, *os.File) {
 			},
 		},
 	}
-	// 将`readPipe`传递给新进程，用于读取父进程传递给它的消息
+
+	// 重定向标准输入、标准输出和标准错误
 	if createTty {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+	} else {
+		logFile, err := createLogFile(containerName)
+		if err != nil {
+			logger.Sugar().Errorf("create log file err %v", err)
+			return nil, nil
+		}
+		cmd.Stdout = logFile
 	}
+
+	// 将`readPipe`传递给新进程，用于读取父进程传递给它的消息
 	cmd.ExtraFiles = []*os.File{readPipe}
 
 	rootUrl := "/root/software/"

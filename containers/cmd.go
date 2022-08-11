@@ -117,3 +117,19 @@ func NewPsCommand() *cli.Command {
 		},
 	}
 }
+
+func NewLogsCommand() *cli.Command {
+	return &cli.Command{
+		Name:  "logs",
+		Usage: "Fetch the logs of a container. miniker logs [containerName]",
+		Action: func(ctx *cli.Context) error {
+			logger.Sugar().Info("print logs of container")
+			if ctx.Args().Len() == 0 {
+				logger.Sugar().Error("Please input your container name")
+			}
+			containerName := ctx.Args().Get(0)
+			printLogs(containerName)
+			return nil
+		},
+	}
+}

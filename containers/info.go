@@ -21,14 +21,6 @@ type ContainerInfo struct {
 	Status     string `json:"status"`
 }
 
-var (
-	RUNNING             string = "running"
-	STOPED              string = "stoped"
-	EXIT                string = "exit"
-	DefaultInfoLocation string = "/var/run/miniker/%s/"
-	ConfigName          string = "config.json"
-)
-
 func recordContainerInfo(pid int, containerName string, cmds []string) string {
 	cInfo := &ContainerInfo{}
 	cInfo.Pid = strconv.Itoa(pid)
