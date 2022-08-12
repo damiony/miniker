@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"miniker/subsystems"
+	"os"
 
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
@@ -42,7 +43,7 @@ func NewRunCommand() *cli.Command {
 				Name:  "v",
 				Usage: "Bind mount a volume",
 			},
-			&cli.StringFlag{
+			&cli.BoolFlag{
 				Name:  "d",
 				Usage: "Run container in background",
 			},
@@ -56,11 +57,11 @@ func NewRunCommand() *cli.Command {
 				return errors.New("wrong container command")
 			}
 			createTty := ctx.Bool("it")
-			detach := ctx.String("d")
-			if createTty && detach != "" {
+			detach := ctx.Bool("d")
+			if createTty && detach {
 				return errors.New("-it and -d cannot exist at the same time")
 			}
-			if !createTty && detach == "" {
+			if !createTty && !detach {
 				return errors.New("at least one of the '-it' and '-d' must exist")
 			}
 
@@ -125,10 +126,60 @@ func NewLogsCommand() *cli.Command {
 		Action: func(ctx *cli.Context) error {
 			logger.Sugar().Info("print logs of container")
 			if ctx.Args().Len() == 0 {
-				logger.Sugar().Error("Please input your container name")
+				return errors.New("please input your container name")
 			}
 			containerName := ctx.Args().Get(0)
 			printLogs(containerName)
+			return nil
+		},
+	}
+}
+
+func NewExecCommand() *cli.Command {
+	return &cli.Command{
+		Name:  "exec",
+		Usage: "Run a command in a running container",
+		Action: func(ctx *cli.Context) error {
+			if os.Getenv(ENV_EXEC_PID) != "" {
+				logger.Sugar().Infof("enter containers, pid %d", os.Getpid())
+				return nil
+			}
+			if ctx.Args().Len() < 2 {
+				return errors.New("please input container name and commands")
+			}
+			containerName := ctx.Args().Get(0)
+			commands := ctx.Args().Slice()[1:]
+			execCommands(containerName, commands)
+			return nil
+		},
+	}
+}
+
+func NewStopCommand() *cli.Command {
+	return &cli.Command{
+		Name:  "stop",
+		Usage: "Stop running container",
+		Action: func(ctx *cli.Context) error {
+			if ctx.Args().Len() < 1 {
+				return errors.New("please input container name")
+			}
+			containerName := ctx.Args().Get(0)
+			stopContainer(containerName)
+			return nil
+		},
+	}
+}
+
+func NewRemoveCommand() *cli.Command {
+	return &cli.Command{
+		Name:  "remove",
+		Usage: "Remove a container",
+		Action: func(ctx *cli.Context) error {
+			if ctx.Args().Len() < 1 {
+				return errors.New("please input container name")
+			}
+			containerName := ctx.Args().Get(0)
+			removeContainer(containerName)
 			return nil
 		},
 	}

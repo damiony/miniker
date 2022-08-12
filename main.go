@@ -17,6 +17,10 @@ func main() {
 			containers.NewInitCommand(),
 			containers.NewCommitCommand(),
 			containers.NewPsCommand(),
+			containers.NewLogsCommand(),
+			containers.NewExecCommand(),
+			containers.NewStopCommand(),
+			containers.NewRemoveCommand(),
 		},
 	}
 	if err := app.Run(os.Args); err != nil {

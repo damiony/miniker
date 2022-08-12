@@ -24,7 +24,7 @@ type ContainerInfo struct {
 func recordContainerInfo(pid int, containerName string, cmds []string) string {
 	cInfo := &ContainerInfo{}
 	cInfo.Pid = strconv.Itoa(pid)
-	logger.Sugar().Infof("pid : %s", os.Getpid())
+	logger.Sugar().Infof("pid : %d", os.Getpid())
 	cInfo.Id = generateId()
 	cInfo.CreateTime = time.Now().Format("2006-01-02 15:04:05")
 	if containerName == "" {
@@ -155,5 +155,27 @@ func printContainers(containerInfos []*ContainerInfo) {
 	fmt.Printf(infoFormat, "Pid", "Id", "Name", "Status", "CreateTime", "Cmd")
 	for _, info := range containerInfos {
 		fmt.Printf(infoFormat, info.Pid, info.Id, info.Name, info.Status, info.CreateTime, info.Command)
+	}
+}
+
+func updateContainerInfo(containerInfo *ContainerInfo) {
+	dirUrl := fmt.Sprintf(DefaultInfoLocation, containerInfo.Name)
+	fileName := dirUrl + ConfigName
+	file, err := os.OpenFile(fileName, os.O_TRUNC|os.O_WRONLY|os.O_CREATE, 0777)
+	if err != nil {
+		logger.Sugar().Errorf("open file %s err %v", fileName, err)
+		return
+	}
+	defer file.Close()
+
+	b, err := json.Marshal(containerInfo)
+	if err != nil {
+		logger.Sugar().Errorf("marshal err %v", err)
+		return
+	}
+
+	if _, err := file.Write(b); err != nil {
+		logger.Sugar().Errorf("write err %v", err)
+		return
 	}
 }

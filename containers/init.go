@@ -22,10 +22,6 @@ func RunContainerInitProcess() error {
 	if err != nil {
 		return err
 	}
-	// 重新挂载`/proc`
-	// defaultMountFlags := syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
-	// syscall.Mount("proc", "/proc", "proc", uintptr(defaultMountFlags), "")
-
 	// 查找命令的绝对路径
 	path, err := exec.LookPath(commands[0])
 	if err != nil {
@@ -62,7 +58,7 @@ func setUpMount() error {
 
 	logger.Sugar().Infof("Current location is %s", pwd)
 
-	// Todo：挂载/proc和tmpfs需要在privotRoot之前执行，否则会提示无权限
+	// Todo：挂载/proc和tmpfs的步骤需要在privotRoot之前执行，否则可能会提示无权限
 
 	// 挂载/proc
 	defaultMountFlags := syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV

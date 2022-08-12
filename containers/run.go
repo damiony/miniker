@@ -24,7 +24,7 @@ func Run(createTty bool, args []string, cfg *subsystems.SubsystemConfig, volume 
 	containerName = recordContainerInfo(parent.Process.Pid, containerName, args)
 	// 创建cgroup管理器
 	cgroupManager := subsystems.NewCgroupManager("miniker", cfg)
-	defer cgroupManager.Destroy()
+	// defer cgroupManager.Destroy()
 	// 设置资源限制
 	cgroupManager.Set()
 	// 将容器进程加入到cgroup
@@ -35,6 +35,7 @@ func Run(createTty bool, args []string, cfg *subsystems.SubsystemConfig, volume 
 
 	if createTty {
 		parent.Wait()
+		cgroupManager.Destroy()
 
 		// 删除工作目录
 		rootUrl := "/root/software/"
@@ -43,7 +44,8 @@ func Run(createTty bool, args []string, cfg *subsystems.SubsystemConfig, volume 
 
 		deleteContainerInfo(containerName)
 	}
-	os.Exit(0)
+	logger.Sugar().Info(createTty)
+	// os.Exit(0)
 }
 
 // 创建子进程，执行init命令
@@ -91,7 +93,9 @@ func NewParentProcess(createTty bool, volume string, containerName string) (*exe
 			logger.Sugar().Errorf("create log file err %v", err)
 			return nil, nil
 		}
+		// cmd.Stdin = os.Stdin
 		cmd.Stdout = logFile
+		cmd.Stderr = logFile
 	}
 
 	// 将`readPipe`传递给新进程，用于读取父进程传递给它的消息
