@@ -13,18 +13,20 @@ import (
 
 // 容器信息
 type ContainerInfo struct {
-	Pid        string `json:"pid"`
-	Id         string `json:"id"`
-	Name       string `json:"name"`
-	Command    string `json:"command"`
-	CreateTime string `json:"createTime"`
-	Status     string `json:"status"`
+	Pid         string   `json:"pid"`
+	Id          string   `json:"id"`
+	Name        string   `json:"name"`
+	Command     string   `json:"command"`
+	CreateTime  string   `json:"createTime"`
+	Status      string   `json:"status"`
+	Volume      string   `json:"volume"`
+	PortMapping []string `json:"portMapping"`
 }
 
 func recordContainerInfo(pid int, containerName string, cmds []string) string {
 	cInfo := &ContainerInfo{}
 	cInfo.Pid = strconv.Itoa(pid)
-	logger.Sugar().Infof("pid : %d", os.Getpid())
+	logger.Sugar().Infof("Pid %d", os.Getpid())
 	cInfo.Id = generateId()
 	cInfo.CreateTime = time.Now().Format("2006-01-02 15:04:05")
 	if containerName == "" {

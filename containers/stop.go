@@ -1,6 +1,7 @@
 package containers
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -35,6 +36,7 @@ func stopContainer(containerName string) {
 	updateContainerInfo(containerInfo)
 
 	// 卸载mntUrl
+	mntUrl := fmt.Sprintf(MntUrl, os.Getenv("HOME"), containerName)
 	cmd := exec.Command("umount", mntUrl)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

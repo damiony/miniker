@@ -18,6 +18,7 @@ func removeContainer(containerName string) {
 		return
 	}
 	// 删除mntUrl
+	mntUrl := fmt.Sprintf(MntUrl, os.Getenv("HOME"), containerName)
 	if err := os.RemoveAll(mntUrl); err != nil {
 		logger.Sugar().Errorf("remove %s err %v", mntUrl, err)
 		return

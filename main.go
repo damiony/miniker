@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"miniker/containers"
+	"miniker/networks"
 	"os"
 
 	"github.com/urfave/cli/v2"
@@ -21,6 +22,7 @@ func main() {
 			containers.NewExecCommand(),
 			containers.NewStopCommand(),
 			containers.NewRemoveCommand(),
+			networks.NewNetworkCommand(),
 		},
 	}
 	if err := app.Run(os.Args); err != nil {

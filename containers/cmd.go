@@ -11,8 +11,6 @@ import (
 )
 
 var logger *zap.Logger
-var rootUrl string = "/root/software"
-var mntUrl string = "/root/software/mnt"
 
 func init() {
 	logger, _ = zap.NewProduction()
@@ -51,6 +49,14 @@ func NewRunCommand() *cli.Command {
 				Name:  "name",
 				Usage: "Assign a name to the container",
 			},
+			&cli.StringFlag{
+				Name:  "network",
+				Usage: "Connect a container to a network",
+			},
+			&cli.StringSliceFlag{
+				Name:  "p",
+				Usage: "Publish a container's ports to the host",
+			},
 		},
 		Action: func(ctx *cli.Context) error {
 			if ctx.Args().Len() < 1 {
@@ -71,9 +77,12 @@ func NewRunCommand() *cli.Command {
 				CpuSet:   ctx.String("cpuset"),
 				CpuShare: ctx.String("cpushare"),
 			}
-			cmds := ctx.Args().Slice()
+			imageName := ctx.Args().Get(0)
+			cmds := ctx.Args().Slice()[1:]
 			containerName := ctx.String("name")
-			Run(createTty, cmds, subsystemConfig, volume, containerName)
+			networkName := ctx.String("network")
+			portMapping := ctx.StringSlice("p")
+			Run(createTty, cmds, subsystemConfig, volume, containerName, imageName, networkName, portMapping)
 			return nil
 		},
 	}
@@ -84,7 +93,7 @@ func NewInitCommand() *cli.Command {
 		Name:  "init",
 		Usage: "Init container process",
 		Action: func(ctx *cli.Context) error {
-			logger.Sugar().Info("init come on")
+			logger.Sugar().Info("Init come on")
 			err := RunContainerInitProcess()
 			return err
 		},
@@ -97,11 +106,12 @@ func NewCommitCommand() *cli.Command {
 		Usage: "Create a new image from a container",
 		Action: func(ctx *cli.Context) error {
 			logger.Sugar().Info("Commit a new image")
-			if ctx.Args().Len() < 1 {
-				return fmt.Errorf("wrong parameters")
+			if ctx.Args().Len() < 2 {
+				return fmt.Errorf("please input container name and image name")
 			}
-			imangeName := ctx.Args().Get(0)
-			commitImage(imangeName)
+			containerName := ctx.Args().Get(0)
+			imangeName := ctx.Args().Get(1)
+			commitImage(containerName, imangeName)
 			return nil
 		},
 	}

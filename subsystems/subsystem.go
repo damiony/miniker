@@ -53,7 +53,7 @@ func NewCgroupManager(path string, cfg *SubsystemConfig) *CgroupManager {
 }
 
 func (s *CgroupManager) Set() error {
-	logger.Sugar().Info("set cgroup")
+	logger.Sugar().Info("Set cgroup")
 	for _, subSysIns := range SubsystemsIns {
 		subSysIns.Set(s.Path, s.Config)
 	}
@@ -61,7 +61,7 @@ func (s *CgroupManager) Set() error {
 }
 
 func (s *CgroupManager) Apply(pid int) error {
-	logger.Sugar().Info("apply pid")
+	logger.Sugar().Info("Apply pid")
 	for _, subSysIns := range SubsystemsIns {
 		subSysIns.Apply(s.Path, pid)
 	}
